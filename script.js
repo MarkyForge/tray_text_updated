@@ -116,6 +116,16 @@
     }
   });
 
+  const customColorPicker = document.getElementById('customColorPicker');
+  customColorPicker.addEventListener('input', ()=>{
+    const color = customColorPicker.value;
+    const applied = wrapSelectionWithStyle('color', color);
+    if(!applied){
+      [...swatches.children].forEach(c=>c.classList.remove('active'));
+      liveText.style.color = color;
+    }
+  });
+
   // ---- size / weight / tracking / leading / width: whole-block controls ----
   sizeRange.addEventListener('input', ()=>{
     liveText.style.fontSize = sizeRange.value + 'px';
