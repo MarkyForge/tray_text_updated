@@ -1,5 +1,5 @@
 :root{
-    --bg:#0e0e10;
+    --bg:#ffffff;
     --panel:#f7f5ef;
     --ink:#141414;
     --gold:#c9a227;
@@ -10,7 +10,7 @@
   html,body{margin:0;padding:0;}
   body{
     background:var(--bg);
-    color:var(--panel);
+    color:var(--ink);
     font-family:'Inter',sans-serif;
     min-height:100vh;
     display:flex;
