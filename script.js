@@ -127,8 +127,25 @@
   });
 
   // ---- size / weight / tracking / leading / width: whole-block controls ----
+  // The size slider's number is a "logical" size: it should look the same
+  // relative to the tray whether the preview is rendered big (wide window)
+  // or small (narrow window). We scale the actual applied font-size by how
+  // the stage's on-screen width compares to its size when the page loaded.
+  let baseFontSize = Number(sizeRange.value) || 34;
+  let stageDesignWidth = null;
+
+  function applyFontSize(){
+    const stageRect = document.querySelector('.stage').getBoundingClientRect();
+    if(!stageDesignWidth && stageRect.width){
+      stageDesignWidth = stageRect.width; // captured once, on first real layout
+    }
+    const scale = stageDesignWidth ? (stageRect.width / stageDesignWidth) : 1;
+    liveText.style.fontSize = (baseFontSize * scale) + 'px';
+  }
+
   sizeRange.addEventListener('input', ()=>{
-    liveText.style.fontSize = sizeRange.value + 'px';
+    baseFontSize = Number(sizeRange.value);
+    applyFontSize();
     sizeVal.textContent = sizeRange.value + 'px';
     [...sizePresets.children].forEach(b=>b.classList.toggle('active', b.dataset.size === sizeRange.value));
   });
@@ -166,6 +183,12 @@
   let offsetY = 0;
   const NUDGE_STEP = 6;
   const stageEl = document.querySelector('.stage');
+
+  if(window.ResizeObserver){
+    new ResizeObserver(()=> applyFontSize()).observe(stageEl);
+  }else{
+    window.addEventListener('resize', applyFontSize);
+  }
 
   function applyPosition(){
     textBlock.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
@@ -516,7 +539,8 @@
   liveText.style.fontFamily = "'Playfair Display', serif";
   liveText.style.fontWeight = "700";
   liveText.style.fontStyle = "italic";
-  liveText.style.fontSize = "34px";
+  baseFontSize = 34;
+  applyFontSize();
   liveText.style.color = "#141414";
   liveText.style.letterSpacing = "0px";
   liveText.style.lineHeight = "1.05";
