@@ -328,15 +328,17 @@
     return photoState.get(img.id);
   }
 
-  // the photo's own "cover" size for the current frame — computed from its natural
-  // aspect ratio, so it overflows the frame on whichever axis doesn't match, and can
-  // be dragged edge-to-edge along that axis even with no extra zoom applied
+  // the photo's own base size for the current frame — computed from its natural
+  // aspect ratio using "contain" (not "cover"), so at 100% zoom it always has
+  // slack on BOTH axes (never locked flush against an edge already). That's what
+  // lets it be dragged edge-to-edge across the whole live preview in every
+  // direction right away, not just along one axis once zoomed in.
   function computeBaseSize(img){
     const stageRect = stageEl.getBoundingClientRect();
     const natW = img.naturalWidth || stageRect.width;
     const natH = img.naturalHeight || stageRect.height;
-    const coverScale = Math.max(stageRect.width / natW, stageRect.height / natH);
-    return { w: natW * coverScale, h: natH * coverScale };
+    const containScale = Math.min(stageRect.width / natW, stageRect.height / natH);
+    return { w: natW * containScale, h: natH * containScale };
   }
 
   function refreshBaseSize(img){
