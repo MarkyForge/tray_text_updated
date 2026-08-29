@@ -519,10 +519,6 @@
   uploadInput.addEventListener('change', ()=>{
     const file = uploadInput.files && uploadInput.files[0];
     if(!file) return;
-    // remember which background is selected right now (before the upload), so the
-    // new photo composites onto *that* choice instead of silently replacing it
-    const prevActiveLayer = [...bgLayers].find(img=> img.classList.contains('active'));
-    const targetPresetId = (prevActiveLayer && prevActiveLayer.id !== 'bgCustom') ? prevActiveLayer.id : null;
     const reader = new FileReader();
     reader.onload = (e)=>{
       bgCustom.onload = ()=>{
@@ -534,24 +530,14 @@
       thumbCustom.style.backgroundImage = `url(${e.target.result})`;
       bgSwatchCustom.style.display = '';
 
-      if(targetPresetId){
-        // a preset background (texture/grid/white) was chosen — composite the
-        // photo on top of it, the same "multiply" blend used by the
-        // "photo on all 3 backgrounds" feature, instead of replacing it
-        bgLayers.forEach(img=> img.classList.toggle('active', img.id === targetPresetId || img === bgCustom));
-        bgCustom.classList.add('blend-composite');
-        applyBlendIntensity();
-        updateBlendIntensityVisibility();
-        [...bgPresets.children].forEach(b=> b.classList.toggle('active', b.dataset.bg === targetPresetId));
-      }else{
-        // no preset background was selected (e.g. an uploaded photo was already
-        // active) — fall back to the photo becoming its own full background
-        bgLayers.forEach(img=> img.classList.toggle('active', img === bgCustom));
-        bgCustom.classList.remove('blend-composite');
-        applyBlendIntensity();
-        updateBlendIntensityVisibility();
-        [...bgPresets.children].forEach(b=> b.classList.toggle('active', b === bgSwatchCustom));
-      }
+      // the uploaded photo simply becomes the background — shown cleanly on
+      // top of the tray, at full opacity, with no multiply blend against
+      // whatever preset (texture/grid/white) was selected before
+      bgLayers.forEach(img=> img.classList.toggle('active', img === bgCustom));
+      bgCustom.classList.remove('blend-composite');
+      applyBlendIntensity();
+      updateBlendIntensityVisibility();
+      [...bgPresets.children].forEach(b=> b.classList.toggle('active', b === bgSwatchCustom));
     };
     reader.readAsDataURL(file);
     uploadInput.value = '';
