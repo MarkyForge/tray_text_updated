@@ -264,6 +264,31 @@
   const bgLayers = document.querySelectorAll('.bg-layer');
   const bgCustom = document.getElementById('bgCustom');
 
+  // ---- blend intensity: how strongly the uploaded photo shows through the
+  // preset background it's composited onto (multiply blend can go very dark) ----
+  const blendIntensitySection = document.getElementById('blendIntensitySection');
+  const blendIntensityRange = document.getElementById('blendIntensityRange');
+  const blendIntensityVal = document.getElementById('blendIntensityVal');
+
+  function applyBlendIntensity(){
+    if(bgCustom.classList.contains('blend-composite')){
+      bgCustom.style.opacity = String(Number(blendIntensityRange.value) / 100);
+    }else{
+      bgCustom.style.opacity = '';
+    }
+  }
+
+  function updateBlendIntensityVisibility(){
+    blendIntensitySection.classList.toggle('visible', bgCustom.classList.contains('blend-composite'));
+  }
+
+  blendIntensityRange.addEventListener('input', ()=>{
+    blendIntensityVal.textContent = blendIntensityRange.value + '%';
+    applyBlendIntensity();
+    updateTripleBgPreviews();
+    scheduleSave();
+  });
+
   // populate the swatch thumbnails from the actual background images already in the page
   document.getElementById('thumbTexture').style.backgroundImage = `url(${document.getElementById('bgTexture').src})`;
   document.getElementById('thumbGrid').style.backgroundImage = `url(${document.getElementById('bgGrid').src})`;
@@ -282,6 +307,8 @@
     if(!btn) return;
     bgLayers.forEach(img=> img.classList.toggle('active', img.id === btn.dataset.bg));
     bgCustom.classList.remove('blend-composite');
+    applyBlendIntensity();
+    updateBlendIntensityVisibility();
     [...bgPresets.children].forEach(b=>b.classList.toggle('active', b===btn));
     if(tripleBgGrid) [...tripleBgGrid.children].forEach(b=> b.classList.remove('active'));
     syncZoomSliderToActive();
@@ -516,6 +543,8 @@
         // "photo on all 3 backgrounds" feature, instead of replacing it
         bgLayers.forEach(img=> img.classList.toggle('active', img.id === targetPresetId || img === bgCustom));
         bgCustom.classList.add('blend-composite');
+        applyBlendIntensity();
+        updateBlendIntensityVisibility();
         [...bgPresets.children].forEach(b=> b.classList.toggle('active', b.dataset.bg === targetPresetId));
         if(tripleBgGrid) [...tripleBgGrid.children].forEach(b=> b.classList.toggle('active', b.dataset.bg === targetPresetId));
       }else{
@@ -523,6 +552,8 @@
         // active) — fall back to the photo becoming its own full background
         bgLayers.forEach(img=> img.classList.toggle('active', img === bgCustom));
         bgCustom.classList.remove('blend-composite');
+        applyBlendIntensity();
+        updateBlendIntensityVisibility();
         [...bgPresets.children].forEach(b=> b.classList.toggle('active', b === bgSwatchCustom));
       }
     };
@@ -554,7 +585,10 @@
         preview.style.backgroundImage = `url(${document.getElementById(id).src})`;
       }
       const photoDiv = preview.querySelector('.triple-bg-photo');
-      if(photoDiv) photoDiv.style.backgroundImage = `url(${bgCustom.src})`;
+      if(photoDiv){
+        photoDiv.style.backgroundImage = `url(${bgCustom.src})`;
+        photoDiv.style.opacity = String(Number(blendIntensityRange.value) / 100);
+      }
     });
   }
 
@@ -565,6 +599,8 @@
     const targetId = item.dataset.bg;
     bgLayers.forEach(img=> img.classList.toggle('active', img.id === targetId || img === bgCustom));
     bgCustom.classList.add('blend-composite');
+    applyBlendIntensity();
+    updateBlendIntensityVisibility();
     [...bgPresets.children].forEach(b=> b.classList.remove('active'));
     [...tripleBgGrid.children].forEach(b=> b.classList.toggle('active', b === item));
     syncZoomSliderToActive();
@@ -700,6 +736,8 @@
         activeSwatchColor: activeSwatch ? activeSwatch.dataset.color : null,
         customColor: customColorPicker.value,
         activeBg: activeBgLayer ? activeBgLayer.id : 'bgTexture',
+        blendComposite: bgCustom.classList.contains('blend-composite'),
+        blendIntensity: blendIntensityRange.value,
         ratio: activeRatioBtn ? activeRatioBtn.dataset.ratio : '4/5',
         // only the user's own uploaded photo is worth persisting — the presets
         // already ship with the page, so re-saving them would just bloat storage
@@ -770,6 +808,9 @@
     }
     if(saved.customColor) customColorPicker.value = saved.customColor;
 
+    blendIntensityRange.value = saved.blendIntensity != null ? saved.blendIntensity : 100;
+    blendIntensityVal.textContent = blendIntensityRange.value + '%';
+
     if(saved.ratio){
       stageEl.style.aspectRatio = saved.ratio;
       [...ratioPresets.children].forEach(b=>b.classList.toggle('active', b.dataset.ratio === saved.ratio));
@@ -796,10 +837,13 @@
         }
         bgSwatchCustom.style.display = '';
         thumbCustom.style.backgroundImage = `url(${saved.customPhotoSrc})`;
-        updateTripleBgPreviews();
         const wantsCustomActive = saved.activeBg === 'bgCustom';
         bgLayers.forEach(img=> img.classList.toggle('active', wantsCustomActive ? img === bgCustom : img.id === saved.activeBg));
         [...bgPresets.children].forEach(b=> b.classList.toggle('active', wantsCustomActive ? b === bgSwatchCustom : b.dataset.bg === saved.activeBg));
+        bgCustom.classList.toggle('blend-composite', !!saved.blendComposite);
+        applyBlendIntensity();
+        updateBlendIntensityVisibility();
+        updateTripleBgPreviews();
         syncZoomSliderToActive();
         finishNonPhotoRestore();
       };

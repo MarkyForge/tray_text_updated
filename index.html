@@ -274,6 +274,12 @@
         <input type="file" id="uploadInput" accept="image/*" hidden>
       </div>
 
+      <div class="section" id="blendIntensitySection">
+        <label class="field-label">Photo blend intensity <span class="range-val" id="blendIntensityVal">100%</span></label>
+        <input type="range" id="blendIntensityRange" min="0" max="100" value="100">
+        <p class="hint">Lower this if the multiply blend is making the photo too dark on the texture/grid background.</p>
+      </div>
+
       <div class="section" id="tripleBgSection" style="display:none;">
         <label class="field-label">Your photo on all 3 backgrounds</label>
         <div class="triple-bg-grid" id="tripleBgGrid">

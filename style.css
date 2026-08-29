@@ -460,6 +460,15 @@
     mix-blend-mode:multiply;
   }
 
+  /* controls how strongly the uploaded photo shows through the preset
+     background it's composited onto (see #bgCustom.blend-composite) */
+  #blendIntensitySection{
+    display:none;
+  }
+  #blendIntensitySection.visible{
+    display:block;
+  }
+
   #downloadTripleBtn{
     width:100%;
     background:transparent;
