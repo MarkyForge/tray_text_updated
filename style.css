@@ -101,6 +101,7 @@
     height:auto;
     max-width:none;
     object-fit:fill;
+    z-index:2;
   }
   #bgCustom.active{
     pointer-events:auto;
