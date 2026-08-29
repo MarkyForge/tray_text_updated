@@ -525,11 +525,16 @@
       };
       bgCustom.src = e.target.result;
 
-      // the uploaded photo is composited on top of whichever background
-      // (texture/grid/white) was active — the one the user had clicked —
-      // using a multiply blend so that background shows through the photo
+      // the uploaded photo sits on top of whichever background was active.
+      // On the grid and pure white backgrounds it should just sit fully on
+      // top, plain and opaque — only the textured background still uses a
+      // multiply blend so that texture shows through the photo.
+      const activeBgLayer = [...bgLayers].find(img=> img.classList.contains('active') && img !== bgCustom);
+      const activeBgId = activeBgLayer ? activeBgLayer.id : 'bgTexture';
+      const shouldBlend = activeBgId !== 'bgGrid' && activeBgId !== 'bgWhite';
+
       bgCustom.classList.add('active');
-      bgCustom.classList.add('blend-composite');
+      bgCustom.classList.toggle('blend-composite', shouldBlend);
       applyBlendIntensity();
       updateBlendIntensityVisibility();
     };
