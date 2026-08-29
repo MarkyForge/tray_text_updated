@@ -31,6 +31,7 @@
     liveText.textContent = textInput.value || '';
     refreshCharCount();
     syncingFromInput = false;
+    scheduleSave();
   });
 
   // editing directly on the tray keeps per-word styling, and mirrors plain text back to the textarea
@@ -40,6 +41,7 @@
     textInput.value = liveText.innerText;
     syncingFromPreview = false;
     refreshCharCount();
+    scheduleSave();
   });
 
   // ---- track a "saved" selection inside liveText, so clicking panel controls doesn't lose it ----
@@ -102,6 +104,7 @@
       chip.classList.add('active');
       liveText.style.fontFamily = chip.dataset.font;
     }
+    scheduleSave();
   });
 
   // ---- color ----
@@ -114,6 +117,7 @@
       sw.classList.add('active');
       liveText.style.color = sw.dataset.color;
     }
+    scheduleSave();
   });
 
   const customColorPicker = document.getElementById('customColorPicker');
@@ -124,6 +128,7 @@
       [...swatches.children].forEach(c=>c.classList.remove('active'));
       liveText.style.color = color;
     }
+    scheduleSave();
   });
 
   // ---- size / weight / tracking / leading / width: whole-block controls ----
@@ -148,6 +153,7 @@
     applyFontSize();
     sizeVal.textContent = sizeRange.value + 'px';
     [...sizePresets.children].forEach(b=>b.classList.toggle('active', b.dataset.size === sizeRange.value));
+    scheduleSave();
   });
 
   sizePresets.addEventListener('click', (e)=>{
@@ -160,22 +166,26 @@
   weightRange.addEventListener('input', ()=>{
     liveText.style.fontWeight = weightRange.value;
     weightVal.textContent = weightRange.value;
+    scheduleSave();
   });
 
   trackingRange.addEventListener('input', ()=>{
     liveText.style.letterSpacing = trackingRange.value + 'px';
     trackingVal.textContent = trackingRange.value + 'px';
+    scheduleSave();
   });
 
   leadingRange.addEventListener('input', ()=>{
     const lh = (leadingRange.value / 100).toFixed(2);
     liveText.style.lineHeight = lh;
     leadingVal.textContent = lh;
+    scheduleSave();
   });
 
   widthRange.addEventListener('input', ()=>{
     liveText.style.maxWidth = widthRange.value + '%';
     widthVal.textContent = widthRange.value + '%';
+    scheduleSave();
   });
 
   // ---- position: drag handle + nudge ----
@@ -227,6 +237,7 @@
     if(!dragging) return;
     dragging = false;
     dragHandle.classList.remove('dragging');
+    scheduleSave();
   }
   dragHandle.addEventListener('pointerup', endDrag);
   dragHandle.addEventListener('pointercancel', endDrag);
@@ -237,6 +248,7 @@
       offsetY += Number(btn.dataset.dy) * NUDGE_STEP * 4;
       clampToStage();
       applyPosition();
+      scheduleSave();
     });
   });
 
@@ -244,6 +256,7 @@
     offsetX = 0;
     offsetY = 0;
     applyPosition();
+    scheduleSave();
   });
 
   // ---- background choice ----
@@ -270,6 +283,7 @@
     bgLayers.forEach(img=> img.classList.toggle('active', img.id === btn.dataset.bg));
     [...bgPresets.children].forEach(b=>b.classList.toggle('active', b===btn));
     syncZoomSliderToActive();
+    scheduleSave();
   });
 
   // ---- photo drag (pan) + adjustable zoom (slider, scroll wheel, pinch) ----
@@ -358,6 +372,7 @@
     const scale = Number(photoZoomRange.value) / 100;
     setPhotoZoom(img, scale);
     photoZoomVal.textContent = Math.round(getPhotoState(img).scale * 100) + '%';
+    scheduleSave();
   });
 
   let photoDragging = false;
@@ -384,6 +399,7 @@
       const delta = -e.deltaY * 0.0025;
       setPhotoZoom(img, state.scale + delta);
       syncZoomSliderToActive();
+      scheduleSave();
     }, {passive:false});
 
     img.addEventListener('pointerdown', (e)=>{
@@ -444,6 +460,7 @@
         photoDragging = false;
         img.classList.remove('dragging');
         photoDragImg = null;
+        scheduleSave();
       }
 
       if(wasSingleTap){
@@ -453,6 +470,7 @@
           resetPhotoState(img);
           syncZoomSliderToActive();
           lastTapTime = 0;
+          scheduleSave();
         }else{
           lastTapTime = now;
         }
@@ -468,6 +486,9 @@
 
   uploadBtn.addEventListener('click', ()=> uploadInput.click());
 
+  const bgSwatchCustom = document.getElementById('bgSwatchCustom');
+  const thumbCustom = document.getElementById('thumbCustom');
+
   uploadInput.addEventListener('change', ()=>{
     const file = uploadInput.files && uploadInput.files[0];
     if(!file) return;
@@ -476,10 +497,16 @@
       bgCustom.onload = ()=>{
         resetPhotoState(bgCustom);
         syncZoomSliderToActive();
+        scheduleSave();
       };
       bgCustom.src = e.target.result;
+      // the upload becomes a proper, persistent "background" option alongside the
+      // presets — its own swatch lights up in the same row, with the same click
+      // behavior, instead of a hidden one-off state that presets could silently replace
       bgLayers.forEach(img=> img.classList.toggle('active', img === bgCustom));
-      [...bgPresets.children].forEach(b=> b.classList.remove('active'));
+      thumbCustom.style.backgroundImage = `url(${e.target.result})`;
+      bgSwatchCustom.style.display = '';
+      [...bgPresets.children].forEach(b=> b.classList.toggle('active', b === bgSwatchCustom));
     };
     reader.readAsDataURL(file);
     uploadInput.value = '';
@@ -501,6 +528,7 @@
         applyPhotoTransform(bgCustom);
       }
     });
+    scheduleSave();
   });
 
   // ---- download ----
@@ -535,18 +563,164 @@
     dragHandle.style.visibility = '';
   });
 
+  // ---- save / restore across page refreshes ----
+  // Everything editable — the typed/styled text, every whole-block style control,
+  // the text's position, which background is chosen, the uploaded photo itself
+  // (as a data URL) with its own pan/zoom, and the composition ratio — gets
+  // bundled into one object and written to localStorage so a refresh restores
+  // the tray exactly as it was left. Saves are debounced so rapid input (typing,
+  // dragging a slider) doesn't hammer localStorage on every keystroke/tick.
+  const STORAGE_KEY = 'servedTray_v1';
+  let saveTimer = null;
+  function scheduleSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveStateNow, 250);
+  }
+
+  function saveStateNow(){
+    try{
+      const activeBgLayer = [...bgLayers].find(img=> img.classList.contains('active'));
+      const activeFontChip = fontGrid.querySelector('.font-chip.active');
+      const activeSwatch = swatches.querySelector('.swatch.active');
+      const activeRatioBtn = ratioPresets.querySelector('button.active');
+      const customState = photoState.get('bgCustom');
+      const state = {
+        textHTML: liveText.innerHTML,
+        textFont: liveText.style.fontFamily,
+        textWeight: liveText.style.fontWeight,
+        textStyle: liveText.style.fontStyle,
+        textColor: liveText.style.color,
+        baseFontSize: baseFontSize,
+        tracking: trackingRange.value,
+        leading: leadingRange.value,
+        width: widthRange.value,
+        offsetX: offsetX,
+        offsetY: offsetY,
+        activeFont: activeFontChip ? activeFontChip.dataset.font : null,
+        activeSwatchColor: activeSwatch ? activeSwatch.dataset.color : null,
+        customColor: customColorPicker.value,
+        activeBg: activeBgLayer ? activeBgLayer.id : 'bgTexture',
+        ratio: activeRatioBtn ? activeRatioBtn.dataset.ratio : '4/5',
+        // only the user's own uploaded photo is worth persisting — the presets
+        // already ship with the page, so re-saving them would just bloat storage
+        customPhotoSrc: (bgCustom.src && bgCustom.src.startsWith('data:')) ? bgCustom.src : null,
+        customPhotoState: customState ? {scale: customState.scale, x: customState.x, y: customState.y} : null
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(err){
+      console.warn('Could not save tray state:', err);
+    }
+  }
+
+  function loadSavedState(){
+    let raw;
+    try{ raw = localStorage.getItem(STORAGE_KEY); }catch(err){ return null; }
+    if(!raw) return null;
+    try{ return JSON.parse(raw); }catch(err){ return null; }
+  }
+
+  function applyDefaults(){
+    liveText.style.fontFamily = "'Playfair Display', serif";
+    liveText.style.fontWeight = "700";
+    liveText.style.fontStyle = "italic";
+    baseFontSize = 34;
+    liveText.style.color = "#141414";
+    liveText.style.letterSpacing = "0px";
+    liveText.style.lineHeight = "1.05";
+    liveText.style.maxWidth = "78%";
+    document.querySelector('.size-presets button[data-size="34"]').classList.add('active');
+  }
+
+  function restoreState(saved){
+    if(saved.textHTML != null) liveText.innerHTML = saved.textHTML;
+    if(saved.textFont) liveText.style.fontFamily = saved.textFont;
+    if(saved.textWeight) liveText.style.fontWeight = saved.textWeight;
+    if(saved.textStyle) liveText.style.fontStyle = saved.textStyle;
+    if(saved.textColor) liveText.style.color = saved.textColor;
+
+    baseFontSize = Number(saved.baseFontSize) || 34;
+    sizeRange.value = baseFontSize;
+    sizeVal.textContent = baseFontSize + 'px';
+    [...sizePresets.children].forEach(b=>b.classList.toggle('active', Number(b.dataset.size) === baseFontSize));
+
+    weightRange.value = saved.textWeight || '700';
+    weightVal.textContent = weightRange.value;
+
+    trackingRange.value = saved.tracking != null ? saved.tracking : 0;
+    liveText.style.letterSpacing = trackingRange.value + 'px';
+    trackingVal.textContent = trackingRange.value + 'px';
+
+    leadingRange.value = saved.leading != null ? saved.leading : 105;
+    const lh = (leadingRange.value / 100).toFixed(2);
+    liveText.style.lineHeight = lh;
+    leadingVal.textContent = lh;
+
+    widthRange.value = saved.width != null ? saved.width : 78;
+    liveText.style.maxWidth = widthRange.value + '%';
+    widthVal.textContent = widthRange.value + '%';
+
+    offsetX = saved.offsetX || 0;
+    offsetY = saved.offsetY || 0;
+
+    if(saved.activeFont){
+      [...fontGrid.children].forEach(c=>c.classList.toggle('active', c.dataset.font === saved.activeFont));
+    }
+    if(saved.activeSwatchColor){
+      [...swatches.children].forEach(c=>c.classList.toggle('active', c.dataset.color === saved.activeSwatchColor));
+    }
+    if(saved.customColor) customColorPicker.value = saved.customColor;
+
+    if(saved.ratio){
+      stageEl.style.aspectRatio = saved.ratio;
+      [...ratioPresets.children].forEach(b=>b.classList.toggle('active', b.dataset.ratio === saved.ratio));
+    }
+
+    const finishNonPhotoRestore = ()=>{
+      applyFontSize();
+      applyPosition();
+      clampToStage();
+      applyPosition();
+      textInput.value = liveText.innerText;
+      refreshCharCount();
+    };
+
+    if(saved.customPhotoSrc){
+      bgCustom.onload = ()=>{
+        if(saved.customPhotoState){
+          const size = computeBaseSize(bgCustom);
+          photoState.set('bgCustom', {scale: saved.customPhotoState.scale, x: saved.customPhotoState.x, y: saved.customPhotoState.y, baseW: size.w, baseH: size.h});
+          clampPhotoState(getPhotoState(bgCustom));
+          applyPhotoTransform(bgCustom);
+        }else{
+          resetPhotoState(bgCustom);
+        }
+        bgSwatchCustom.style.display = '';
+        thumbCustom.style.backgroundImage = `url(${saved.customPhotoSrc})`;
+        const wantsCustomActive = saved.activeBg === 'bgCustom';
+        bgLayers.forEach(img=> img.classList.toggle('active', wantsCustomActive ? img === bgCustom : img.id === saved.activeBg));
+        [...bgPresets.children].forEach(b=> b.classList.toggle('active', wantsCustomActive ? b === bgSwatchCustom : b.dataset.bg === saved.activeBg));
+        syncZoomSliderToActive();
+        finishNonPhotoRestore();
+      };
+      bgCustom.src = saved.customPhotoSrc;
+    }else{
+      const targetBg = saved.activeBg || 'bgTexture';
+      bgLayers.forEach(img=> img.classList.toggle('active', img.id === targetBg));
+      [...bgPresets.children].forEach(b=> b.classList.toggle('active', b.dataset.bg === targetBg));
+      syncZoomSliderToActive();
+      finishNonPhotoRestore();
+    }
+  }
+
   // ---- init ----
-  liveText.style.fontFamily = "'Playfair Display', serif";
-  liveText.style.fontWeight = "700";
-  liveText.style.fontStyle = "italic";
-  baseFontSize = 34;
-  applyFontSize();
-  liveText.style.color = "#141414";
-  liveText.style.letterSpacing = "0px";
-  liveText.style.lineHeight = "1.05";
-  liveText.style.maxWidth = "78%";
-  document.querySelector('.size-presets button[data-size="34"]').classList.add('active');
-  applyPosition();
-  textInput.value = liveText.innerText;
-  refreshCharCount();
-  syncZoomSliderToActive();
+  const savedState = loadSavedState();
+  if(savedState){
+    restoreState(savedState);
+  }else{
+    applyDefaults();
+    applyFontSize();
+    applyPosition();
+    textInput.value = liveText.innerText;
+    refreshCharCount();
+    syncZoomSliderToActive();
+  }
