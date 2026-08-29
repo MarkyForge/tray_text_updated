@@ -513,9 +513,6 @@
 
   uploadBtn.addEventListener('click', ()=> uploadInput.click());
 
-  const bgSwatchCustom = document.getElementById('bgSwatchCustom');
-  const thumbCustom = document.getElementById('thumbCustom');
-
   uploadInput.addEventListener('change', ()=>{
     const file = uploadInput.files && uploadInput.files[0];
     if(!file) return;
@@ -527,8 +524,6 @@
         scheduleSave();
       };
       bgCustom.src = e.target.result;
-      thumbCustom.style.backgroundImage = `url(${e.target.result})`;
-      bgSwatchCustom.style.display = '';
 
       // the uploaded photo simply becomes the background — shown cleanly on
       // top of the tray, at full opacity, with no multiply blend against
@@ -537,7 +532,7 @@
       bgCustom.classList.remove('blend-composite');
       applyBlendIntensity();
       updateBlendIntensityVisibility();
-      [...bgPresets.children].forEach(b=> b.classList.toggle('active', b === bgSwatchCustom));
+      [...bgPresets.children].forEach(b=> b.classList.remove('active'));
     };
     reader.readAsDataURL(file);
     uploadInput.value = '';
@@ -730,11 +725,9 @@
         }else{
           resetPhotoState(bgCustom);
         }
-        bgSwatchCustom.style.display = '';
-        thumbCustom.style.backgroundImage = `url(${saved.customPhotoSrc})`;
         const wantsCustomActive = saved.activeBg === 'bgCustom';
         bgLayers.forEach(img=> img.classList.toggle('active', wantsCustomActive ? img === bgCustom : img.id === saved.activeBg));
-        [...bgPresets.children].forEach(b=> b.classList.toggle('active', wantsCustomActive ? b === bgSwatchCustom : b.dataset.bg === saved.activeBg));
+        [...bgPresets.children].forEach(b=> b.classList.toggle('active', wantsCustomActive ? false : b.dataset.bg === saved.activeBg));
         bgCustom.classList.toggle('blend-composite', !!saved.blendComposite);
         applyBlendIntensity();
         updateBlendIntensityVisibility();
