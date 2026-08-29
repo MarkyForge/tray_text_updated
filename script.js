@@ -281,7 +281,9 @@
     const btn = e.target.closest('.bg-swatch');
     if(!btn) return;
     bgLayers.forEach(img=> img.classList.toggle('active', img.id === btn.dataset.bg));
+    bgCustom.classList.remove('blend-composite');
     [...bgPresets.children].forEach(b=>b.classList.toggle('active', b===btn));
+    if(tripleBgGrid) [...tripleBgGrid.children].forEach(b=> b.classList.remove('active'));
     syncZoomSliderToActive();
     scheduleSave();
   });
@@ -497,6 +499,7 @@
       bgCustom.onload = ()=>{
         resetPhotoState(bgCustom);
         syncZoomSliderToActive();
+        updateTripleBgPreviews();
         scheduleSave();
       };
       bgCustom.src = e.target.result;
@@ -510,6 +513,88 @@
     };
     reader.readAsDataURL(file);
     uploadInput.value = '';
+  });
+
+  // ---- photo composited onto all 3 preset backgrounds ----
+  const tripleBgSection = document.getElementById('tripleBgSection');
+  const tripleBgGrid = document.getElementById('tripleBgGrid');
+  const downloadTripleBtn = document.getElementById('downloadTripleBtn');
+  const downloadTripleLabel = document.getElementById('downloadTripleLabel');
+  const PRESET_BG_IDS = ['bgTexture', 'bgGrid', 'bgWhite'];
+  const PRESET_BG_NAMES = { bgTexture: 'texture', bgGrid: 'grid', bgWhite: 'white' };
+
+  // fills in the 3 little preview swatches with "preset background + your photo,
+  // multiplied together" so you can see roughly how each version will look
+  function updateTripleBgPreviews(){
+    const hasPhoto = bgCustom.src && bgCustom.src.startsWith('data:');
+    tripleBgSection.style.display = hasPhoto ? '' : 'none';
+    if(!hasPhoto) return;
+    PRESET_BG_IDS.forEach(id=>{
+      const preview = document.getElementById('triplePreview' + id.replace('bg', ''));
+      if(!preview) return;
+      if(id === 'bgWhite'){
+        preview.style.backgroundImage = 'none';
+        preview.style.backgroundColor = '#ffffff';
+      }else{
+        preview.style.backgroundImage = `url(${document.getElementById(id).src})`;
+      }
+      const photoDiv = preview.querySelector('.triple-bg-photo');
+      if(photoDiv) photoDiv.style.backgroundImage = `url(${bgCustom.src})`;
+    });
+  }
+
+  // tapping a preview shows that preset + your photo composited together, live, on the stage
+  tripleBgGrid.addEventListener('click', (e)=>{
+    const item = e.target.closest('.triple-bg-item');
+    if(!item) return;
+    const targetId = item.dataset.bg;
+    bgLayers.forEach(img=> img.classList.toggle('active', img.id === targetId || img === bgCustom));
+    bgCustom.classList.add('blend-composite');
+    [...bgPresets.children].forEach(b=> b.classList.remove('active'));
+    [...tripleBgGrid.children].forEach(b=> b.classList.toggle('active', b === item));
+    syncZoomSliderToActive();
+    scheduleSave();
+  });
+
+  // shows one preset+photo composite on the stage, captures it, then restores
+  // whatever combination of layers was showing before the capture
+  async function captureCompositeFrame(bgId){
+    const prevActiveIds = [...bgLayers].filter(img=> img.classList.contains('active')).map(img=> img.id);
+    const hadBlend = bgCustom.classList.contains('blend-composite');
+    bgLayers.forEach(img=> img.classList.toggle('active', img.id === bgId || img === bgCustom));
+    bgCustom.classList.add('blend-composite');
+    dragHandle.style.visibility = 'hidden';
+    await new Promise(r=> setTimeout(r, 80)); // let the opacity transition settle before capturing
+    const canvas = await html2canvas(stageEl, { backgroundColor: '#f7f5ef', scale: 3, useCORS: true });
+    bgLayers.forEach(img=> img.classList.toggle('active', prevActiveIds.includes(img.id)));
+    bgCustom.classList.toggle('blend-composite', hadBlend);
+    dragHandle.style.visibility = '';
+    return canvas;
+  }
+
+  downloadTripleBtn.addEventListener('click', async ()=>{
+    if(!bgCustom.src || !bgCustom.src.startsWith('data:')) return;
+    downloadTripleBtn.disabled = true;
+    downloadTripleLabel.textContent = 'Preparing…';
+    try{
+      if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+      for(const id of PRESET_BG_IDS){
+        const canvas = await captureCompositeFrame(id);
+        const link = document.createElement('a');
+        link.download = `tray-announcement-${PRESET_BG_NAMES[id]}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        await new Promise(r=> setTimeout(r, 250)); // give the browser a beat between downloads
+      }
+    }catch(err){
+      console.error(err);
+      downloadTripleLabel.textContent = 'Failed — try again';
+      setTimeout(()=>{ downloadTripleLabel.textContent = 'Download all 3 versions'; }, 1800);
+      downloadTripleBtn.disabled = false;
+      return;
+    }
+    downloadTripleLabel.textContent = 'Download all 3 versions';
+    downloadTripleBtn.disabled = false;
   });
 
   // ---- composition size (aspect ratio) ----
@@ -696,6 +781,7 @@
         }
         bgSwatchCustom.style.display = '';
         thumbCustom.style.backgroundImage = `url(${saved.customPhotoSrc})`;
+        updateTripleBgPreviews();
         const wantsCustomActive = saved.activeBg === 'bgCustom';
         bgLayers.forEach(img=> img.classList.toggle('active', wantsCustomActive ? img === bgCustom : img.id === saved.activeBg));
         [...bgPresets.children].forEach(b=> b.classList.toggle('active', wantsCustomActive ? b === bgSwatchCustom : b.dataset.bg === saved.activeBg));
