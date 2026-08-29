@@ -194,10 +194,17 @@
   const NUDGE_STEP = 6;
   const stageEl = document.querySelector('.stage');
 
+  // Runs on every stage resize (window resize, panel collapsing at a
+  // breakpoint, etc). Re-assigned below once the photo pan/zoom helpers
+  // exist, so it also keeps the uploaded photo's edge-to-edge drag bounds
+  // correct at any live-preview size, not just right after upload or a
+  // ratio-preset click.
+  let onStageResize = ()=> applyFontSize();
+
   if(window.ResizeObserver){
-    new ResizeObserver(()=> applyFontSize()).observe(stageEl);
+    new ResizeObserver(()=> onStageResize()).observe(stageEl);
   }else{
-    window.addEventListener('resize', applyFontSize);
+    window.addEventListener('resize', ()=> onStageResize());
   }
 
   function applyPosition(){
@@ -408,6 +415,20 @@
     photoZoomVal.textContent = Math.round(getPhotoState(img).scale * 100) + '%';
     scheduleSave();
   });
+
+  // now that the photo pan/zoom helpers exist, make the stage-resize handler
+  // also keep the uploaded photo's base size and drag bounds in sync with
+  // the live preview's current on-screen size (not just its aspect ratio) —
+  // this is what makes edge-to-edge dragging keep working after the window
+  // is resized, the panel layout collapses, etc, at any preview size.
+  onStageResize = ()=>{
+    applyFontSize();
+    if(bgCustom.classList.contains('active') && bgCustom.naturalWidth){
+      refreshBaseSize(bgCustom);
+      clampPhotoState(getPhotoState(bgCustom));
+      applyPhotoTransform(bgCustom);
+    }
+  };
 
   let photoDragging = false;
   let photoDragImg = null;
