@@ -525,14 +525,13 @@
       };
       bgCustom.src = e.target.result;
 
-      // the uploaded photo simply becomes the background — shown cleanly on
-      // top of the tray, at full opacity, with no multiply blend against
-      // whatever preset (texture/grid/white) was selected before
-      bgLayers.forEach(img=> img.classList.toggle('active', img === bgCustom));
-      bgCustom.classList.remove('blend-composite');
+      // the uploaded photo is composited on top of whichever background
+      // (texture/grid/white) was active — the one the user had clicked —
+      // using a multiply blend so that background shows through the photo
+      bgCustom.classList.add('active');
+      bgCustom.classList.add('blend-composite');
       applyBlendIntensity();
       updateBlendIntensityVisibility();
-      [...bgPresets.children].forEach(b=> b.classList.remove('active'));
     };
     reader.readAsDataURL(file);
     uploadInput.value = '';
@@ -605,7 +604,7 @@
 
   function saveStateNow(){
     try{
-      const activeBgLayer = [...bgLayers].find(img=> img.classList.contains('active'));
+      const activeBgLayer = [...bgLayers].find(img=> img.classList.contains('active') && img !== bgCustom);
       const activeFontChip = fontGrid.querySelector('.font-chip.active');
       const activeSwatch = swatches.querySelector('.swatch.active');
       const activeRatioBtn = ratioPresets.querySelector('button.active');
@@ -725,9 +724,9 @@
         }else{
           resetPhotoState(bgCustom);
         }
-        const wantsCustomActive = saved.activeBg === 'bgCustom';
-        bgLayers.forEach(img=> img.classList.toggle('active', wantsCustomActive ? img === bgCustom : img.id === saved.activeBg));
-        [...bgPresets.children].forEach(b=> b.classList.toggle('active', wantsCustomActive ? false : b.dataset.bg === saved.activeBg));
+        const targetBg = saved.activeBg || 'bgTexture';
+        bgLayers.forEach(img=> img.classList.toggle('active', img.id === targetBg || (img === bgCustom && !!saved.blendComposite)));
+        [...bgPresets.children].forEach(b=> b.classList.toggle('active', b.dataset.bg === targetBg));
         bgCustom.classList.toggle('blend-composite', !!saved.blendComposite);
         applyBlendIntensity();
         updateBlendIntensityVisibility();
