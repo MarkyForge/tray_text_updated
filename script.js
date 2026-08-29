@@ -494,6 +494,10 @@
   uploadInput.addEventListener('change', ()=>{
     const file = uploadInput.files && uploadInput.files[0];
     if(!file) return;
+    // remember which background is selected right now (before the upload), so the
+    // new photo composites onto *that* choice instead of silently replacing it
+    const prevActiveLayer = [...bgLayers].find(img=> img.classList.contains('active'));
+    const targetPresetId = (prevActiveLayer && prevActiveLayer.id !== 'bgCustom') ? prevActiveLayer.id : null;
     const reader = new FileReader();
     reader.onload = (e)=>{
       bgCustom.onload = ()=>{
@@ -503,13 +507,24 @@
         scheduleSave();
       };
       bgCustom.src = e.target.result;
-      // the upload becomes a proper, persistent "background" option alongside the
-      // presets — its own swatch lights up in the same row, with the same click
-      // behavior, instead of a hidden one-off state that presets could silently replace
-      bgLayers.forEach(img=> img.classList.toggle('active', img === bgCustom));
       thumbCustom.style.backgroundImage = `url(${e.target.result})`;
       bgSwatchCustom.style.display = '';
-      [...bgPresets.children].forEach(b=> b.classList.toggle('active', b === bgSwatchCustom));
+
+      if(targetPresetId){
+        // a preset background (texture/grid/white) was chosen — composite the
+        // photo on top of it, the same "multiply" blend used by the
+        // "photo on all 3 backgrounds" feature, instead of replacing it
+        bgLayers.forEach(img=> img.classList.toggle('active', img.id === targetPresetId || img === bgCustom));
+        bgCustom.classList.add('blend-composite');
+        [...bgPresets.children].forEach(b=> b.classList.toggle('active', b.dataset.bg === targetPresetId));
+        if(tripleBgGrid) [...tripleBgGrid.children].forEach(b=> b.classList.toggle('active', b.dataset.bg === targetPresetId));
+      }else{
+        // no preset background was selected (e.g. an uploaded photo was already
+        // active) — fall back to the photo becoming its own full background
+        bgLayers.forEach(img=> img.classList.toggle('active', img === bgCustom));
+        bgCustom.classList.remove('blend-composite');
+        [...bgPresets.children].forEach(b=> b.classList.toggle('active', b === bgSwatchCustom));
+      }
     };
     reader.readAsDataURL(file);
     uploadInput.value = '';
