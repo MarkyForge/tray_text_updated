@@ -305,7 +305,12 @@
     const btn = e.target.closest('.bg-swatch');
     if(!btn) return;
     bgLayers.forEach(img=> img.classList.toggle('active', img.id === btn.dataset.bg));
-    bgCustom.classList.remove('blend-composite');
+    // keep the uploaded photo's texture-through-photo blend consistent
+    // across all three backgrounds (texture, grid, pure white) instead of
+    // stripping it whenever the background choice changes.
+    if(bgCustom.classList.contains('active')){
+      bgCustom.classList.add('blend-composite');
+    }
     applyBlendIntensity();
     updateBlendIntensityVisibility();
     [...bgPresets.children].forEach(b=>b.classList.toggle('active', b===btn));
@@ -526,15 +531,12 @@
       bgCustom.src = e.target.result;
 
       // the uploaded photo sits on top of whichever background was active.
-      // On the grid and pure white backgrounds it should just sit fully on
-      // top, plain and opaque — only the textured background still uses a
-      // multiply blend so that texture shows through the photo.
-      const activeBgLayer = [...bgLayers].find(img=> img.classList.contains('active') && img !== bgCustom);
-      const activeBgId = activeBgLayer ? activeBgLayer.id : 'bgTexture';
-      const shouldBlend = activeBgId !== 'bgGrid' && activeBgId !== 'bgWhite';
-
+      // it always gets the same multiply blend so the texture look is
+      // consistent no matter which of the three backgrounds (texture, grid,
+      // pure white) is selected — the grid and pure white backgrounds no
+      // longer get a special-cased plain/opaque photo.
       bgCustom.classList.add('active');
-      bgCustom.classList.toggle('blend-composite', shouldBlend);
+      bgCustom.classList.toggle('blend-composite', true);
       applyBlendIntensity();
       updateBlendIntensityVisibility();
     };
