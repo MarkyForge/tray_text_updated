@@ -280,28 +280,6 @@
         <p class="hint">Lower this if the multiply blend is making the photo too dark on the texture/grid background.</p>
       </div>
 
-      <div class="section" id="tripleBgSection" style="display:none;">
-        <label class="field-label">Your photo on all 3 backgrounds</label>
-        <div class="triple-bg-grid" id="tripleBgGrid">
-          <button type="button" class="triple-bg-item" data-bg="bgTexture">
-            <span class="triple-bg-preview" id="triplePreviewTexture"><span class="triple-bg-photo"></span></span>
-            Texture
-          </button>
-          <button type="button" class="triple-bg-item" data-bg="bgGrid">
-            <span class="triple-bg-preview" id="triplePreviewGrid"><span class="triple-bg-photo"></span></span>
-            Grid
-          </button>
-          <button type="button" class="triple-bg-item" data-bg="bgWhite">
-            <span class="triple-bg-preview" id="triplePreviewWhite"><span class="triple-bg-photo"></span></span>
-            Pure White
-          </button>
-        </div>
-        <button id="downloadTripleBtn" type="button" style="margin-top:10px;">
-          <span id="downloadTripleLabel">Download all 3 versions</span>
-        </button>
-        <p class="hint">Tap a preview to use that background, or download all three composited versions at once.</p>
-      </div>
-
       <div class="section" id="photoZoomSection">
         <label class="field-label">Photo zoom <span class="range-val" id="photoZoomVal">100%</span></label>
         <input type="range" id="photoZoomRange" min="40" max="300" step="1" value="100" disabled>
