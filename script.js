@@ -7,6 +7,7 @@
   const sizeVal = document.getElementById('sizeVal');
   const weightRange = document.getElementById('weightRange');
   const weightVal = document.getElementById('weightVal');
+  const italicToggle = document.getElementById('italicToggle');
   const sizePresets = document.getElementById('sizePresets');
   const trackingRange = document.getElementById('trackingRange');
   const trackingVal = document.getElementById('trackingVal');
@@ -93,6 +94,8 @@
   }
   preventFocusSteal(fontGrid);
   preventFocusSteal(swatches);
+  preventFocusSteal(sizePresets);
+  italicToggle.addEventListener('mousedown', (e)=> e.preventDefault());
 
   // ---- font family ----
   fontGrid.addEventListener('click', (e)=>{
@@ -139,18 +142,66 @@
   let baseFontSize = Number(sizeRange.value) || 34;
   let stageDesignWidth = null;
 
-  function applyFontSize(){
+  function getFontScale(){
     const stageRect = document.querySelector('.stage').getBoundingClientRect();
     if(!stageDesignWidth && stageRect.width){
       stageDesignWidth = stageRect.width; // captured once, on first real layout
     }
-    const scale = stageDesignWidth ? (stageRect.width / stageDesignWidth) : 1;
-    liveText.style.fontSize = (baseFontSize * scale) + 'px';
+    return stageDesignWidth ? (stageRect.width / stageDesignWidth) : 1;
   }
 
+  function applyFontSize(){
+    liveText.style.fontSize = (baseFontSize * getFontScale()) + 'px';
+  }
+
+  // Dragging the range slider fires many 'input' events per drag, so we
+  // can't just re-wrap the selection on every tick (that would consume the
+  // saved selection on the first tick and fall back to resizing the whole
+  // tray for the rest of the drag). Instead we grab the highlighted range
+  // once, when the gesture starts, wrap it in a span on the first tick,
+  // then keep nudging that same span's size for the rest of the drag.
+  let sizeGestureRange = null;
+  let sizeGestureSpan = null;
+
+  function captureSizeGestureSelection(){
+    sizeGestureSpan = null;
+    sizeGestureRange = getActiveSelectionRange();
+    if(sizeGestureRange) sizeGestureRange = sizeGestureRange.cloneRange();
+  }
+
+  function endSizeGesture(){
+    sizeGestureRange = null;
+    sizeGestureSpan = null;
+  }
+
+  sizeRange.addEventListener('pointerdown', captureSizeGestureSelection);
+  sizeRange.addEventListener('change', endSizeGesture);
+
   sizeRange.addEventListener('input', ()=>{
-    baseFontSize = Number(sizeRange.value);
-    applyFontSize();
+    // if part of the text is/was highlighted, resize just that selection;
+    // otherwise fall back to resizing the whole tray's text like before.
+    const px = Number(sizeRange.value) * getFontScale();
+    if(sizeGestureSpan){
+      sizeGestureSpan.style.fontSize = px + 'px';
+    }else if(sizeGestureRange){
+      const span = document.createElement('span');
+      span.style.fontSize = px + 'px';
+      try{
+        sizeGestureRange.surroundContents(span);
+      }catch(e){
+        const frag = sizeGestureRange.extractContents();
+        span.appendChild(frag);
+        sizeGestureRange.insertNode(span);
+      }
+      sizeGestureSpan = span;
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      savedRange = null;
+      refreshCharCount();
+    }else{
+      baseFontSize = Number(sizeRange.value);
+      applyFontSize();
+    }
     sizeVal.textContent = sizeRange.value + 'px';
     [...sizePresets.children].forEach(b=>b.classList.toggle('active', b.dataset.size === sizeRange.value));
     scheduleSave();
@@ -159,13 +210,75 @@
   sizePresets.addEventListener('click', (e)=>{
     const btn = e.target.closest('button');
     if(!btn) return;
+    captureSizeGestureSelection();
     sizeRange.value = btn.dataset.size;
     sizeRange.dispatchEvent(new Event('input'));
+    endSizeGesture();
   });
 
+  // ---- weight: applies to the highlighted selection if there is one,
+  // otherwise flips the whole tray's text (same gesture pattern as size,
+  // since the range slider fires many 'input' events per drag) ----
+  let weightGestureRange = null;
+  let weightGestureSpan = null;
+
+  function captureWeightGestureSelection(){
+    weightGestureSpan = null;
+    weightGestureRange = getActiveSelectionRange();
+    if(weightGestureRange) weightGestureRange = weightGestureRange.cloneRange();
+  }
+
+  function endWeightGesture(){
+    weightGestureRange = null;
+    weightGestureSpan = null;
+  }
+
+  weightRange.addEventListener('pointerdown', captureWeightGestureSelection);
+  weightRange.addEventListener('change', endWeightGesture);
+
   weightRange.addEventListener('input', ()=>{
-    liveText.style.fontWeight = weightRange.value;
+    if(weightGestureSpan){
+      weightGestureSpan.style.fontWeight = weightRange.value;
+    }else if(weightGestureRange){
+      const span = document.createElement('span');
+      span.style.fontWeight = weightRange.value;
+      try{
+        weightGestureRange.surroundContents(span);
+      }catch(e){
+        const frag = weightGestureRange.extractContents();
+        span.appendChild(frag);
+        weightGestureRange.insertNode(span);
+      }
+      weightGestureSpan = span;
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      savedRange = null;
+      refreshCharCount();
+    }else{
+      liveText.style.fontWeight = weightRange.value;
+    }
     weightVal.textContent = weightRange.value;
+    scheduleSave();
+  });
+
+  // ---- italic: applies to the highlighted selection if there is one,
+  // otherwise flips the whole tray's text like the other toggles ----
+  function isNodeItalic(node){
+    const el = node.nodeType === 3 ? node.parentElement : node;
+    return !!el && getComputedStyle(el).fontStyle === 'italic';
+  }
+
+  italicToggle.addEventListener('click', ()=>{
+    const range = getActiveSelectionRange();
+    if(range){
+      const turningOff = isNodeItalic(range.startContainer);
+      wrapSelectionWithStyle('fontStyle', turningOff ? 'normal' : 'italic');
+    }else{
+      const turningOff = getComputedStyle(liveText).fontStyle === 'italic';
+      liveText.style.fontStyle = turningOff ? 'normal' : 'italic';
+      italicToggle.classList.toggle('active', !turningOff);
+      italicToggle.setAttribute('aria-pressed', String(!turningOff));
+    }
     scheduleSave();
   });
 
@@ -183,7 +296,7 @@
   });
 
   widthRange.addEventListener('input', ()=>{
-    liveText.style.maxWidth = widthRange.value + '%';
+    textBlock.style.width = widthRange.value + '%';
     widthVal.textContent = widthRange.value + '%';
     scheduleSave();
   });
@@ -684,7 +797,7 @@
     liveText.style.color = "#141414";
     liveText.style.letterSpacing = "0px";
     liveText.style.lineHeight = "1.05";
-    liveText.style.maxWidth = "78%";
+    textBlock.style.width = "78%";
     document.querySelector('.size-presets button[data-size="34"]').classList.add('active');
   }
 
@@ -694,6 +807,10 @@
     if(saved.textWeight) liveText.style.fontWeight = saved.textWeight;
     if(saved.textStyle) liveText.style.fontStyle = saved.textStyle;
     if(saved.textColor) liveText.style.color = saved.textColor;
+
+    const savedItalic = getComputedStyle(liveText).fontStyle === 'italic';
+    italicToggle.classList.toggle('active', savedItalic);
+    italicToggle.setAttribute('aria-pressed', String(savedItalic));
 
     baseFontSize = Number(saved.baseFontSize) || 34;
     sizeRange.value = baseFontSize;
@@ -713,7 +830,7 @@
     leadingVal.textContent = lh;
 
     widthRange.value = saved.width != null ? saved.width : 78;
-    liveText.style.maxWidth = widthRange.value + '%';
+    textBlock.style.width = widthRange.value + '%';
     widthVal.textContent = widthRange.value + '%';
 
     offsetX = saved.offsetX || 0;
