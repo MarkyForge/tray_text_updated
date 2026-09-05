@@ -126,6 +126,34 @@
     transform:translate(-50%,-50%);
     z-index:3;
   }
+  /* sticker/logo overlay — sits above the text and background, its own
+     independent drag/zoom layer (same pan+zoom mechanics as #bgCustom) */
+  #stickerLayer{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:auto;
+    height:auto;
+    max-width:none;
+    object-fit:contain;
+    transform-origin:center center;
+    user-select:none;
+    -webkit-user-drag:none;
+    pointer-events:none;
+    opacity:0;
+    z-index:5;
+    transition:opacity .2s ease;
+  }
+  #stickerLayer.active{
+    opacity:1;
+    pointer-events:auto;
+    cursor:grab;
+    touch-action:none;
+  }
+  #stickerLayer.active.dragging{
+    cursor:grabbing;
+    transition:none;
+  }
   #dragHandle{
     position:absolute;
     left:50%;
@@ -512,7 +540,7 @@
   #downloadTripleBtn:active{transform:translateY(1px);}
   #downloadTripleBtn:disabled{opacity:.6;cursor:wait;}
 
-  #uploadBtn{
+  .tray-upload-btn{
     width:100%;
     background:transparent;
     color:var(--panel);
@@ -527,8 +555,33 @@
     cursor:pointer;
     transition:border-color .12s ease, background .12s ease, transform .12s ease;
   }
-  #uploadBtn:hover{border-color:var(--gold); background:rgba(201,162,39,.08);}
-  #uploadBtn:active{transform:translateY(1px);}
+  .tray-upload-btn:hover{border-color:var(--gold); background:rgba(201,162,39,.08);}
+  .tray-upload-btn:active{transform:translateY(1px);}
+
+  .sticker-btn-row{
+    display:flex;
+    gap:8px;
+  }
+  .sticker-btn-row .tray-upload-btn{
+    flex:1;
+  }
+  .sticker-remove-btn{
+    flex:0 0 auto;
+    background:transparent;
+    color:#e63946;
+    border:1px solid rgba(230,57,70,.5);
+    border-radius:10px;
+    padding:14px 14px;
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    font-weight:700;
+    cursor:pointer;
+    transition:border-color .12s ease, background .12s ease, transform .12s ease;
+  }
+  .sticker-remove-btn:hover{border-color:#e63946; background:rgba(230,57,70,.08);}
+  .sticker-remove-btn:active{transform:translateY(1px);}
 
   #downloadBtn{
     width:100%;

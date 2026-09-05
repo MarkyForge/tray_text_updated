@@ -31,6 +31,7 @@
           <div id="dragHandle" title="Drag to move">⠿⠿</div>
           <div id="liveText" contenteditable="true" spellcheck="false" data-placeholder="Type here…">Order up</div>
         </div>
+        <img id="stickerLayer" alt="">
       </div>
       <div class="stage-foot">
         <span><span class="dot"></span>live preview</span>
@@ -266,7 +267,7 @@
       </div>
 
       <div class="section">
-        <button id="uploadBtn" type="button">
+        <button id="uploadBtn" class="tray-upload-btn" type="button">
           <span id="uploadLabel">Upload Photo</span>
         </button>
         <input type="file" id="uploadInput" accept="image/*" hidden>
@@ -282,6 +283,18 @@
         <label class="field-label">Photo zoom <span class="range-val" id="photoZoomVal">100%</span></label>
         <input type="range" id="photoZoomRange" min="40" max="300" step="1" value="100" disabled>
         <p class="hint" id="photoZoomHint">Upload your own photo to zoom and reposition it — drag the photo itself once zoomed in.</p>
+      </div>
+
+      <div class="section">
+        <label class="field-label">Sticker / logo <span class="range-val">optional overlay</span></label>
+        <div class="sticker-btn-row">
+          <button id="stickerBtn" class="tray-upload-btn" type="button">
+            <span id="stickerLabel">Add image</span>
+          </button>
+          <button id="stickerRemoveBtn" class="sticker-remove-btn" type="button" hidden>Remove</button>
+        </div>
+        <input type="file" id="stickerInput" accept="image/*" hidden>
+        <p class="hint">Sits on top of everything in the live preview. Drag it to reposition, scroll or pinch to resize, double-click/tap to reset.</p>
       </div>
 
       <div class="section">

@@ -541,6 +541,11 @@
       clampPhotoState(getPhotoState(bgCustom));
       applyPhotoTransform(bgCustom);
     }
+    if(stickerLayer.classList.contains('active') && stickerLayer.naturalWidth){
+      refreshBaseSize(stickerLayer);
+      clampPhotoState(getPhotoState(stickerLayer));
+      applyPhotoTransform(stickerLayer);
+    }
   };
 
   let photoDragging = false;
@@ -558,7 +563,7 @@
     return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
   }
 
-  (function setupPhotoInteractions(img){
+  function setupPhotoInteractions(img){
     // mouse / trackpad scroll wheel to zoom, centered on cursor position
     img.addEventListener('wheel', (e)=>{
       if(!img.classList.contains('active')) return;
@@ -646,7 +651,8 @@
     }
     img.addEventListener('pointerup', endPhotoDrag);
     img.addEventListener('pointercancel', endPhotoDrag);
-  })(bgCustom);
+  }
+  setupPhotoInteractions(bgCustom);
 
   // ---- upload your own photo as the background ----
   const uploadBtn = document.getElementById('uploadBtn');
@@ -680,6 +686,51 @@
     uploadInput.value = '';
   });
 
+  // ---- sticker/logo overlay: a second, independent uploaded image that sits
+  // on top of everything in the live preview (its own drag + wheel/pinch zoom,
+  // reusing the same pan/zoom mechanics as the background photo above) ----
+  const stickerLayer = document.getElementById('stickerLayer');
+  const stickerBtn = document.getElementById('stickerBtn');
+  const stickerInput = document.getElementById('stickerInput');
+  const stickerRemoveBtn = document.getElementById('stickerRemoveBtn');
+  const stickerLabel = document.getElementById('stickerLabel');
+  const STICKER_DEFAULT_SCALE = 0.35; // starts small, like a logo — not full-frame
+
+  setupPhotoInteractions(stickerLayer);
+
+  stickerBtn.addEventListener('click', ()=> stickerInput.click());
+
+  stickerInput.addEventListener('change', ()=>{
+    const file = stickerInput.files && stickerInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      stickerLayer.onload = ()=>{
+        resetPhotoState(stickerLayer);
+        const state = getPhotoState(stickerLayer);
+        state.scale = STICKER_DEFAULT_SCALE;
+        clampPhotoState(state);
+        applyPhotoTransform(stickerLayer);
+        stickerLayer.classList.add('active');
+        stickerRemoveBtn.hidden = false;
+        stickerLabel.textContent = 'Change image';
+        scheduleSave();
+      };
+      stickerLayer.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    stickerInput.value = '';
+  });
+
+  stickerRemoveBtn.addEventListener('click', ()=>{
+    stickerLayer.classList.remove('active');
+    stickerLayer.removeAttribute('src');
+    photoState.delete(stickerLayer.id);
+    stickerRemoveBtn.hidden = true;
+    stickerLabel.textContent = 'Add image';
+    scheduleSave();
+  });
+
   // ---- composition size (aspect ratio) ----
   const ratioPresets = document.getElementById('ratioPresets');
   ratioPresets.addEventListener('click', (e)=>{
@@ -694,6 +745,11 @@
         refreshBaseSize(bgCustom);
         clampPhotoState(getPhotoState(bgCustom));
         applyPhotoTransform(bgCustom);
+      }
+      if(stickerLayer.classList.contains('active') && stickerLayer.naturalWidth){
+        refreshBaseSize(stickerLayer);
+        clampPhotoState(getPhotoState(stickerLayer));
+        applyPhotoTransform(stickerLayer);
       }
     });
     scheduleSave();
@@ -752,6 +808,7 @@
       const activeSwatch = swatches.querySelector('.swatch.active');
       const activeRatioBtn = ratioPresets.querySelector('button.active');
       const customState = photoState.get('bgCustom');
+      const stickerState = photoState.get('stickerLayer');
       const state = {
         textHTML: liveText.innerHTML,
         textFont: liveText.style.fontFamily,
@@ -774,7 +831,10 @@
         // only the user's own uploaded photo is worth persisting — the presets
         // already ship with the page, so re-saving them would just bloat storage
         customPhotoSrc: (bgCustom.src && bgCustom.src.startsWith('data:')) ? bgCustom.src : null,
-        customPhotoState: customState ? {scale: customState.scale, x: customState.x, y: customState.y} : null
+        customPhotoState: customState ? {scale: customState.scale, x: customState.x, y: customState.y} : null,
+        // sticker/logo overlay — independent of the background photo above
+        stickerSrc: (stickerLayer.classList.contains('active') && stickerLayer.src && stickerLayer.src.startsWith('data:')) ? stickerLayer.src : null,
+        stickerState: stickerState ? {scale: stickerState.scale, x: stickerState.x, y: stickerState.y} : null
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }catch(err){
@@ -887,6 +947,23 @@
       [...bgPresets.children].forEach(b=> b.classList.toggle('active', b.dataset.bg === targetBg));
       syncZoomSliderToActive();
       finishNonPhotoRestore();
+    }
+
+    if(saved.stickerSrc){
+      stickerLayer.onload = ()=>{
+        if(saved.stickerState){
+          const size = computeBaseSize(stickerLayer);
+          photoState.set('stickerLayer', {scale: saved.stickerState.scale, x: saved.stickerState.x, y: saved.stickerState.y, baseW: size.w, baseH: size.h});
+          clampPhotoState(getPhotoState(stickerLayer));
+          applyPhotoTransform(stickerLayer);
+        }else{
+          resetPhotoState(stickerLayer);
+        }
+        stickerLayer.classList.add('active');
+        stickerRemoveBtn.hidden = false;
+        stickerLabel.textContent = 'Change image';
+      };
+      stickerLayer.src = saved.stickerSrc;
     }
   }
 
